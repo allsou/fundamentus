@@ -1,18 +1,7 @@
-# Fundamentus
-Esta é uma pequena API feita em python3 para análise de ações da BOVESPA utilizando o site fundamentus (www.fundamentus.com.br), que retorna os 
-principais indicadores fundamentalistas em formato JSON.
-A API utiliza o microframework Flask.
-Também é possível utilizar via linha de comando.
+# Clube do Valor - Stock Picking API
+- Eliminamos empresas com liquidez inferior a R$ 200.000,00
+- Eliminamos empresas com margem ebit negativa
+- Ranqueamos empresas do menor ao maior Ev-Ebit
+- Adquirimos as principais empresas, eliminando bancos e seguradoras;
 
-# Linha de comando
-    $ python3 fundamentus.py
-
-# API
-Execute o server.py e conecte no endereço (ex.: http://127.0.0.1:5000/) com seu browser
-
-# Requirements
-    Flask
-    lxml
-    
-Install with:
-    pip3 install -r required.txt
+# Forked From [fundamentus](https://github.com/phoemur/fundamentus)
