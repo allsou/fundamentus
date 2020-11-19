@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import http.cookiejar
+import logging
 import re
 import urllib.parse
 import urllib.request
@@ -9,23 +10,34 @@ from decimal import Decimal
 
 from lxml.html import fragment_fromstring
 
+LOGGER = logging.getLogger('sLogger')
+
 
 def get_details_by_paper(paper_name: str):
-    url = 'http://www.fundamentus.com.br/detalhes.php'
+    LOGGER.info('Getting papers details at Fundamentus...')
+    url = f'http://www.fundamentus.com.br/detalhes.php?papel={paper_name}'
     cookie_jar = http.cookiejar.CookieJar()
     opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cookie_jar))
     opener.addheaders = [
         ('User-agent', 'Mozilla/5.0 (Windows; U; Windows NT 6.1; rv:2.2) Gecko/20110201'),
         ('Accept', 'text/html, text/plain, text/css, text/sgml, */*;q=0.01')
     ]
-    query = {
-        'papel': paper_name
-    }
-    with opener.open(url, urllib.parse.urlencode(query).encode('UTF-8')) as link:
+    with opener.open(url) as link:
+        LOGGER.info(f'Establishing connection to {url}...')
         content = link.read().decode('ISO-8859-1')
+    pattern = re.compile('Valor da firma</span>.*Número total de ações', re.DOTALL)
+    enterprise_value = re.findall(pattern, content)
+    LOGGER.debug(enterprise_value)
+    pattern = re.compile('<span class="txt">EBIT</span></td>.*</tr>', re.DOTALL)
+    ebit = re.findall(pattern, content)
+    LOGGER.debug(ebit)
+    # page = fragment_fromstring(content)
+    # LOGGER.debug(page)
+
 
 
 def get_papers():
+    LOGGER.info('Getting papers at Fundamentus...')
     url = 'http://www.fundamentus.com.br/resultado.php'
     cookie_jar = http.cookiejar.CookieJar()
     opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cookie_jar))
@@ -33,7 +45,6 @@ def get_papers():
         ('User-agent', 'Mozilla/5.0 (Windows; U; Windows NT 6.1; rv:2.2) Gecko/20110201'),
         ('Accept', 'text/html, text/plain, text/css, text/sgml, */*;q=0.01')
     ]
-
     # Eliminamos empresas com liquidez inferior a R$ 200.000,00
     # Eliminamos empresas com margem ebit negativa
     query = {
@@ -81,8 +92,10 @@ def get_papers():
     }
 
     with opener.open(url, urllib.parse.urlencode(query).encode('UTF-8')) as link:
+        LOGGER.info(f'Establishing connection to {url}...')
         content = link.read().decode('ISO-8859-1')
 
+    LOGGER.info('Using regex to get results...')
     pattern = re.compile('<table id="resultado".*</table>', re.DOTALL)
     content = re.findall(pattern, content)[0]
     page = fragment_fromstring(content)
@@ -90,35 +103,40 @@ def get_papers():
 
     for rows in page.xpath('tbody')[0].findall("tr"):
         result.update(
-            {rows.getchildren()[0][0].getchildren()[0].text: {'Cotacao': todecimal(rows.getchildren()[1].text),
-                                                              'P/L': todecimal(rows.getchildren()[2].text),
-                                                              'P/VP': todecimal(rows.getchildren()[3].text),
-                                                              'PSR': todecimal(rows.getchildren()[4].text),
-                                                              'DY': todecimal(rows.getchildren()[5].text),
-                                                              'P/Ativo': todecimal(rows.getchildren()[6].text),
-                                                              'P/Cap.Giro': todecimal(rows.getchildren()[7].text),
-                                                              'P/EBIT': todecimal(rows.getchildren()[8].text),
-                                                              'P/ACL': todecimal(rows.getchildren()[9].text),
-                                                              'EV/EBIT': todecimal(rows.getchildren()[10].text),
-                                                              'EV/EBITDA': todecimal(rows.getchildren()[11].text),
-                                                              'Mrg.Ebit': todecimal(rows.getchildren()[12].text),
-                                                              'Mrg.Liq.': todecimal(rows.getchildren()[13].text),
-                                                              'Liq.Corr.': todecimal(rows.getchildren()[14].text),
-                                                              'ROIC': todecimal(rows.getchildren()[15].text),
-                                                              'ROE': todecimal(rows.getchildren()[16].text),
-                                                              'Liq.2meses': todecimal(rows.getchildren()[17].text),
-                                                              'Pat.Liq': todecimal(rows.getchildren()[18].text),
-                                                              'Div.Brut/Pat.': todecimal(rows.getchildren()[19].text),
-                                                              'Cresc.5anos': todecimal(rows.getchildren()[20].text)}})
+            {
+                rows.getchildren()[0][0].getchildren()[0].text: {
+                    'Cotacao': to_decimal(rows.getchildren()[1].text),
+                    'P/L': to_decimal(rows.getchildren()[2].text),
+                    'P/VP': to_decimal(rows.getchildren()[3].text),
+                    'PSR': to_decimal(rows.getchildren()[4].text),
+                    'DY': to_decimal(rows.getchildren()[5].text),
+                    'P/Ativo': to_decimal(rows.getchildren()[6].text),
+                    'P/Cap.Giro': to_decimal(rows.getchildren()[7].text),
+                    'P/EBIT': to_decimal(rows.getchildren()[8].text),
+                    'P/ACL': to_decimal(rows.getchildren()[9].text),
+                    'EV/EBIT': to_decimal(rows.getchildren()[10].text),
+                    'EV/EBITDA': to_decimal(rows.getchildren()[11].text),
+                    'Mrg.Ebit': to_decimal(rows.getchildren()[12].text),
+                    'Mrg.Liq.': to_decimal(rows.getchildren()[13].text),
+                    'Liq.Corr.': to_decimal(rows.getchildren()[14].text),
+                    'ROIC': to_decimal(rows.getchildren()[15].text),
+                    'ROE': to_decimal(rows.getchildren()[16].text),
+                    'Liq.2meses': to_decimal(rows.getchildren()[17].text),
+                    'Pat.Liq': to_decimal(rows.getchildren()[18].text),
+                    'Div.Brut/Pat.': to_decimal(rows.getchildren()[19].text),
+                    'Cresc.5anos': to_decimal(rows.getchildren()[20].text)
+                }
+            }
+        )
 
     return result
 
 
-def todecimal(string):
+def to_decimal(string):
     string = string.replace('.', '')
     string = string.replace(',', '.')
 
-    if (string.endswith('%')):
+    if string.endswith('%'):
         string = string[:-1]
         return Decimal(string) / 100
     else:
@@ -126,55 +144,60 @@ def todecimal(string):
 
 
 if __name__ == '__main__':
-    from waitingbar import WaitingBar
-
-    progress_bar = WaitingBar('[*] Downloading...')
+    LOGGER.info('Starting crawler')
     result = get_papers()
-    progress_bar.stop()
 
     result_format = '{0:<7} {1:<7} {2:<10} {3:<7} {4:<10} {5:<7} {6:<10} {7:<10} {8:<10} {9:<11} {10:<11} {11:<7} {12:<11} {13:<11} {14:<7} {15:<11} {16:<5} {17:<7}'
-    print(result_format.format('Papel',
-                               'Cotacao',
-                               'P/L',
-                               'P/VP',
-                               'PSR',
-                               'DY',
-                               'P/Ativo',
-                               'P/Cap.Giro',
-                               'P/EBIT',
-                               'P/ACL',
-                               'EV/EBIT',
-                               'EV/EBITDA',
-                               'Mrg.Ebit',
-                               'Mrg.Liq.',
-                               'Liq.Corr.',
-                               'ROIC',
-                               'ROE',
-                               'Liq.2meses',
-                               'Pat.Liq',
-                               'Div.Brut/Pat.',
-                               'Cresc.5anos'))
+    print(
+        result_format.format(
+            'Papel',
+            'Cotacao',
+            'P/L',
+            'P/VP',
+            'PSR',
+            'DY',
+            'P/Ativo',
+            'P/Cap.Giro',
+            'P/EBIT',
+            'P/ACL',
+            'EV/EBIT',
+            'EV/EBITDA',
+            'Mrg.Ebit',
+            'Mrg.Liq.',
+            'Liq.Corr.',
+            'ROIC',
+            'ROE',
+            'Liq.2meses',
+            'Pat.Liq',
+            'Div.Brut/Pat.',
+            'Cresc.5anos'
+        )
+    )
 
     print('-' * 190)
     for key, value in result.items():
-        print(result_format.format(key,
-                                   value['Cotacao'],
-                                   value['P/L'],
-                                   value['P/VP'],
-                                   value['PSR'],
-                                   value['DY'],
-                                   value['P/Ativo'],
-                                   value['P/Cap.Giro'],
-                                   value['P/EBIT'],
-                                   value['P/ACL'],
-                                   value['EV/EBIT'],
-                                   value['EV/EBITDA'],
-                                   value['Mrg.Ebit'],
-                                   value['Mrg.Liq.'],
-                                   value['Liq.Corr.'],
-                                   value['ROIC'],
-                                   value['ROE'],
-                                   value['Liq.2meses'],
-                                   value['Pat.Liq'],
-                                   value['Div.Brut/Pat.'],
-                                   value['Cresc.5anos']))
+        print(
+            result_format.format(
+                key,
+                value['Cotacao'],
+                value['P/L'],
+                value['P/VP'],
+                value['PSR'],
+                value['DY'],
+                value['P/Ativo'],
+                value['P/Cap.Giro'],
+                value['P/EBIT'],
+                value['P/ACL'],
+                value['EV/EBIT'],
+                value['EV/EBITDA'],
+                value['Mrg.Ebit'],
+                value['Mrg.Liq.'],
+                value['Liq.Corr.'],
+                value['ROIC'],
+                value['ROE'],
+                value['Liq.2meses'],
+                value['Pat.Liq'],
+                value['Div.Brut/Pat.'],
+                value['Cresc.5anos']
+            )
+        )
