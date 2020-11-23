@@ -25,16 +25,19 @@ def get_details_by_paper(paper_name: str):
     with opener.open(url) as link:
         LOGGER.info(f'Establishing connection to {url}...')
         content = link.read().decode('ISO-8859-1')
+    LOGGER.debug('Using regex to get Ev')
     pattern = re.compile('Valor da firma</span>.*Número total de ações', re.DOTALL)
     enterprise_value = re.findall(pattern, content)
-    LOGGER.debug(enterprise_value)
+    enterprise_value = int(enterprise_value[0].split('<')[4].split('>')[1].replace('.', ''))
+    LOGGER.debug(f'Ev {paper_name}: {enterprise_value}')
+    LOGGER.debug('Using regex to get Ebit')
     pattern = re.compile('<span class="txt">EBIT</span></td>.*</tr>', re.DOTALL)
     ebit = re.findall(pattern, content)
-    LOGGER.debug(ebit)
-    # page = fragment_fromstring(content)
-    # LOGGER.debug(page)
-
-
+    ebit = int(ebit[0].split('<')[5].split('>')[1].replace('.', ''))
+    LOGGER.debug(f'Ebit {paper_name}: {ebit}')
+    result = enterprise_value - ebit
+    LOGGER.debug(f'Ev-Ebit {paper_name}: {result}')
+    return result, ebit/enterprise_value
 
 def get_papers():
     LOGGER.info('Getting papers at Fundamentus...')
@@ -100,7 +103,7 @@ def get_papers():
     content = re.findall(pattern, content)[0]
     page = fragment_fromstring(content)
     result = OrderedDict()
-
+    LOGGER.debug('Iterating table')
     for rows in page.xpath('tbody')[0].findall("tr"):
         result.update(
             {
@@ -128,7 +131,13 @@ def get_papers():
                 }
             }
         )
-
+    LOGGER.debug('Parsing to dict')
+    result = {
+        outer_k:
+            {
+                inner_k: float(inner_v) for inner_k, inner_v in outer_v.items()
+            } for outer_k, outer_v in result.items()
+    }
     return result
 
 
@@ -141,63 +150,3 @@ def to_decimal(string):
         return Decimal(string) / 100
     else:
         return Decimal(string)
-
-
-if __name__ == '__main__':
-    LOGGER.info('Starting crawler')
-    result = get_papers()
-
-    result_format = '{0:<7} {1:<7} {2:<10} {3:<7} {4:<10} {5:<7} {6:<10} {7:<10} {8:<10} {9:<11} {10:<11} {11:<7} {12:<11} {13:<11} {14:<7} {15:<11} {16:<5} {17:<7}'
-    print(
-        result_format.format(
-            'Papel',
-            'Cotacao',
-            'P/L',
-            'P/VP',
-            'PSR',
-            'DY',
-            'P/Ativo',
-            'P/Cap.Giro',
-            'P/EBIT',
-            'P/ACL',
-            'EV/EBIT',
-            'EV/EBITDA',
-            'Mrg.Ebit',
-            'Mrg.Liq.',
-            'Liq.Corr.',
-            'ROIC',
-            'ROE',
-            'Liq.2meses',
-            'Pat.Liq',
-            'Div.Brut/Pat.',
-            'Cresc.5anos'
-        )
-    )
-
-    print('-' * 190)
-    for key, value in result.items():
-        print(
-            result_format.format(
-                key,
-                value['Cotacao'],
-                value['P/L'],
-                value['P/VP'],
-                value['PSR'],
-                value['DY'],
-                value['P/Ativo'],
-                value['P/Cap.Giro'],
-                value['P/EBIT'],
-                value['P/ACL'],
-                value['EV/EBIT'],
-                value['EV/EBITDA'],
-                value['Mrg.Ebit'],
-                value['Mrg.Liq.'],
-                value['Liq.Corr.'],
-                value['ROIC'],
-                value['ROE'],
-                value['Liq.2meses'],
-                value['Pat.Liq'],
-                value['Div.Brut/Pat.'],
-                value['Cresc.5anos']
-            )
-        )
